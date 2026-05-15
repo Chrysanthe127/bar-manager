@@ -44,6 +44,23 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
+app.get('/api/init-db', async (req, res) => {
+  try {
+    const hashAdmin = await bcrypt.hash('admin123', 10);
+    const hashBoss = await bcrypt.hash('boss123', 10);
+    const hashEmp = await bcrypt.hash('emp123', 10);
+    db.run(`INSERT OR REPLACE INTO users (id, username, password, role, full_name) VALUES 
+      (1, 'admin', ?, 'admin', 'Administrateur'),
+      (2, 'boss', ?, 'boss', 'Patron'),
+      (3, 'emp', ?, 'employee', 'Jean Employé')`, [hashAdmin, hashBoss, hashEmp], (err) => {
+        if (err) res.status(500).json({ error: err.message });
+        else res.json({ message: 'Utilisateurs créés/mis à jour' });
+      });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/products', authenticate, (req, res) => {
   db.all(`SELECT * FROM products ORDER BY name`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
