@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Espace Employé</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <button class="logout-btn" onclick="logout()">Déconnexion</button>
+  <h1>👨‍🍳 Employé - Enregistrer une vente</h1>
+  <div class="card">
+    <h3>Nouvelle vente</h3>
+    <select id="productSelect"></select>
+    <input type="number" id="quantity" placeholder="Quantité" min="1">
+    <button onclick="recordSale()">💰 Encaisser</button>
+  </div>
+
+  <h2>📊 Mes ventes récentes</h2>
+  <table id="salesTable">
+    <thead><tr><th>Produit</th><th>Quantité</th><th>Total</th><th>Date</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = 'login.html';
+
+  async function loadProducts() {
+    const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+    const products = await res.json();
+    const select = document.getElementById('productSelect');
+    select.innerHTML = products.map(p => `<option value="${p.id}">${p.name} - ${p.price}€</option>`).join('');
+  }
+
+  async function recordSale() {
+    const product_id = document.getElementById('productSelect').value;
+    const quantity = document.getElementById('quantity').value;
+    const res = await fetch('/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ product_id, quantity: parseInt(quantity) })
+    });
+    if (res.ok) {
+      alert('Vente enregistrée !');
+      loadSales();
+    } else alert('Erreur');
+  }
+
+  async function loadSales() {
+    const res = await fetch('/api/sales', { headers: { 'Authorization': `Bearer ${token}` } });
+    const sales = await res.json();
+    const tbody = document.querySelector('#salesTable tbody');
+    tbody.innerHTML = sales.map(s => `<tr>
+      <td>${s.product_name}</td><td>${s.quantity}</td><td>${s.total_price}€</td><td>${new Date(s.sale_time).toLocaleString()}</td>
+    </tr>`).join('');
+  }
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = 'login.html';
+  }
+
+  loadProducts();
+  loadSales();
+</script>
+</body>
+</html>

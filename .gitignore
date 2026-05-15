@@ -1,0 +1,32 @@
+node_modules/ 
+bar.db 
+.env 
+
+# Dépendances
+node_modules/
+
+# Base de données SQLite
+bar.db
+*.db
+*.db-journal
+
+# Fichiers d'environnement
+.env
+.env.local
+
+# Fichiers de configuration de l'IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log
+npm-debug.log*
+
+# Fichiers OS
+.DS_Store
+Thumbs.db
+
+# Fichiers temporaires
+*.tmp
+*.temp

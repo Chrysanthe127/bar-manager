@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Patron - Bar Manager</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .profit-card { background: #e0f2fe; border-left: 5px solid #0284c7; }
+    .capital-card { background: #fef9c3; border-left: 5px solid #ca8a04; }
+    .positive { color: #16a34a; font-weight: bold; }
+    .negative { color: #dc2626; font-weight: bold; }
+    .stat-grid { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+    .stat-card { background: #f1f5f9; padding: 15px; border-radius: 12px; flex: 1; min-width: 150px; text-align: center; }
+    .stock-low { background-color: #fee2e2; font-weight: bold; }
+    .toast-notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .toast-notification.show {
+      opacity: 1;
+    }
+    button:active { transform: scale(0.98); }
+    .form-group input, .form-group button { margin: 5px; padding: 8px 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f2f2f2; }
+
+
+    /* Modal pour modification de compte */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-content h3 { margin-top: 0; }
+.modal-content input { width: 100%; margin: 10px 0; padding: 8px; }
+.modal-content button { margin: 5px; }
+  </style>
+</head>
+<body>
+<div class="container">
+    <!-- Modal modification compte -->
+<div id="profileModal" class="modal">
+  <div class="modal-content">
+    <h3>🔐 Modifier mon compte</h3>
+    <input type="text" id="newUsername" placeholder="Nouveau nom d'utilisateur">
+    <input type="password" id="oldPassword" placeholder="Ancien mot de passe">
+    <input type="password" id="newPassword" placeholder="Nouveau mot de passe (optionnel)">
+    <button onclick="updateProfile()">Enregistrer</button>
+    <button onclick="closeModal()">Annuler</button>
+  </div>
+</div>
+  <button class="logout-btn" onclick="logout()">Déconnexion</button>
+<button class="profile-btn" onclick="openModal()" style="background:#2563eb; float:right; margin-right:10px;">👤 Modifier mon compte</button>
+  <h1>👔 Tableau de bord - Patron</h1>
+
+  <!-- Totaux généraux -->
+  <div class="card" style="background: #dbeafe; border-left: 5px solid #1e3a8a;">
+    <h2>📊 Totaux généraux</h2>
+    <div class="stat-grid" id="totauxGeneraux"></div>
+  </div>
+
+  <!-- CA général -->
+  <div id="stats" class="card"></div>
+
+  <!-- Bénéfices / Pertes -->
+  <div id="profitBlock" class="card profit-card">
+    <h2>📈 Bénéfices & Pertes</h2>
+    <div class="stat-grid" id="profitStats"></div>
+    <h3>Détail par produit</h3>
+    <table id="profitTable">
+      <thead><tr><th>Produit</th><th>Prix vente</th><th>Coût revient</th><th>Qté vendue</th><th>CA</th><th>Coût total</th><th>Bénéfice</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Capital investi et stocks -->
+  <div id="capitalBlock" class="card capital-card">
+    <h2>💰 Capital investi & Stocks</h2>
+    <div class="stat-grid" id="capitalStats"></div>
+    <h3>État des stocks (quantité restante)</h3>
+    <table id="stockTable">
+      <thead><tr><th>Produit</th><th>Stock actuel</th><th>Prix de revient (unité)</th><th>Capital immobilisé</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Gestion des produits -->
+  <h2>📦 Gestion des produits</h2>
+  <div class="form-group">
+    <input type="text" id="prodName" placeholder="Nom" required>
+    <input type="number" id="prodPrice" placeholder="Prix vente €" step="0.01">
+    <input type="number" id="prodCost" placeholder="Prix revient €" step="0.01">
+    <input type="number" id="prodStock" placeholder="Stock">
+    <button onclick="addProduct()">➕ Ajouter</button>
+  </div>
+  <table id="productsTable">
+    <thead><tr><th>Nom</th><th>Prix vente</th><th>Prix revient</th><th>Stock</th><th>Actions</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Ventes récentes -->
+  <h2>📋 Ventes récentes</h2>
+  <table id="salesTable">
+    <thead><tr><th>Employé</th><th>Produit</th><th>Qté</th><th>Total</th><th>Date</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- Performances employés -->
+  <h2>🏆 Performances employés (CA)</h2>
+  <ul id="empStats"></ul>
+</div>
+
+<!-- Toast pour notifications -->
+<div id="toast" class="toast-notification"></div>
+
+<script>
+
+    function openModal() {
+  document.getElementById('profileModal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('profileModal').style.display = 'none';
+  document.getElementById('newUsername').value = '';
+  document.getElementById('oldPassword').value = '';
+  document.getElementById('newPassword').value = '';
+}
+
+async function updateProfile() {
+  const newUsername = document.getElementById('newUsername').value.trim();
+  const oldPassword = document.getElementById('oldPassword').value;
+  const newPassword = document.getElementById('newPassword').value;
+  if (!newUsername && !newPassword) {
+    showToast('Au moins un champ à modifier', true);
+    return;
+  }
+  if (newPassword && !oldPassword) {
+    showToast('Ancien mot de passe requis pour changer le mot de passe', true);
+    return;
+  }
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ username: newUsername || undefined, oldPassword, newPassword: newPassword || undefined })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showToast('Profil mis à jour, reconnexion...');
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setTimeout(() => { window.location.reload(); }, 1500);
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = 'login.html';
+
+  function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.background = isError ? '#dc2626' : '#16a34a';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  async function loadStats() {
+    try {
+      const res = await fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Erreur chargement stats');
+      const stats = await res.json();
+      document.getElementById('stats').innerHTML = `
+        <strong>💰 CA aujourd'hui : ${stats.total_today.toFixed(2)}€</strong><br>
+        📅 CA cette semaine : ${stats.total_week.toFixed(2)}€<br>
+        🧾 Nombre total de ventes : ${stats.total_sales}<br>
+      `;
+      const ul = document.getElementById('empStats');
+      ul.innerHTML = stats.employee_stats.map(e => `<li>${e.full_name} : ${e.total.toFixed(2)}€</li>`).join('');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  async function loadProfit() {
+    try {
+      const res = await fetch('/api/profit', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Erreur chargement bénéfices');
+      const profit = await res.json();
+      const profitHtml = `
+        <div class="stat-card">
+          <strong>💰 Bénéfice total</strong><br>
+          <span class="${profit.total_profit >= 0 ? 'positive' : 'negative'}">${profit.total_profit.toFixed(2)}€</span>
+        </div>
+        <div class="stat-card">
+          <strong>📆 Bénéfice aujourd'hui</strong><br>
+          <span class="${profit.profit_today >= 0 ? 'positive' : 'negative'}">${profit.profit_today.toFixed(2)}€</span>
+        </div>
+        <div class="stat-card">
+          <strong>📅 Bénéfice cette semaine</strong><br>
+          <span class="${profit.profit_week >= 0 ? 'positive' : 'negative'}">${profit.profit_week.toFixed(2)}€</span>
+        </div>
+        <div class="stat-card">
+          <strong>📊 Marge brute moyenne</strong><br>${profit.margin_rate}%
+        </div>
+      `;
+      document.getElementById('profitStats').innerHTML = profitHtml;
+
+      const resProd = await fetch('/api/profit-by-product', { headers: { 'Authorization': `Bearer ${token}` } });
+      const productsProfit = await resProd.json();
+      const tbody = document.querySelector('#profitTable tbody');
+      tbody.innerHTML = productsProfit.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td>${p.price}€</td>
+          <td>${p.cost_price}€</td>
+          <td>${p.qty_sold}</td>
+          <td>${p.total_sales.toFixed(2)}€</td>
+          <td>${p.total_cost.toFixed(2)}€</td>
+          <td class="${p.profit >= 0 ? 'positive' : 'negative'}">${p.profit.toFixed(2)}€</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  async function loadCapital() {
+    try {
+      const res = await fetch('/api/capital', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error('Erreur chargement capital');
+      const data = await res.json();
+      const capitalHtml = `
+        <div class="stat-card"><strong>💼 Capital total investi</strong><br>${data.total_capital.toFixed(2)}€</div>
+        <div class="stat-card"><strong>📦 Nombre total d'articles en stock</strong><br>${data.total_stock_items}</div>
+      `;
+      document.getElementById('capitalStats').innerHTML = capitalHtml;
+      const stockTbody = document.querySelector('#stockTable tbody');
+      stockTbody.innerHTML = data.products.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td class="${p.stock < 10 ? 'stock-low' : ''}">${p.stock}</td>
+          <td>${p.cost_price.toFixed(2)}€</td>
+          <td>${p.capital.toFixed(2)}€</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  async function loadTotaux() {
+    try {
+      const [profitRes, capitalRes, prodProfitRes] = await Promise.all([
+        fetch('/api/profit', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/capital', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/profit-by-product', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      if (!profitRes.ok || !capitalRes.ok || !prodProfitRes.ok) throw new Error('Erreur chargement totaux');
+      const profit = await profitRes.json();
+      const capital = await capitalRes.json();
+      const products = await prodProfitRes.json();
+      let totalItemsSold = 0;
+      products.forEach(p => { totalItemsSold += p.qty_sold; });
+      const totauxHtml = `
+        <div class="stat-card"><strong>💰 CA total</strong><br>${profit.total_ca.toFixed(2)}€</div>
+        <div class="stat-card"><strong>📈 Bénéfice total</strong><br><span class="${profit.total_profit >= 0 ? 'positive' : 'negative'}">${profit.total_profit.toFixed(2)}€</span></div>
+        <div class="stat-card"><strong>💼 Capital investi</strong><br>${capital.total_capital.toFixed(2)}€</div>
+        <div class="stat-card"><strong>🍺 Articles vendus</strong><br>${totalItemsSold}</div>
+      `;
+      document.getElementById('totauxGeneraux').innerHTML = totauxHtml;
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      const res = await fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } });
+      const products = await res.json();
+      const tbody = document.querySelector('#productsTable tbody');
+      tbody.innerHTML = products.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td>${p.price}€</td>
+          <td>${p.cost_price || 0}€</td>
+          <td class="${p.stock < 10 ? 'stock-low' : ''}">${p.stock}</td>
+          <td>
+            <button onclick="editProduct(${p.id}, '${p.name}', ${p.price}, ${p.cost_price || 0}, ${p.stock})">✏️</button>
+            <button onclick="deleteProduct(${p.id})">🗑️</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  window.editProduct = async (id, name, price, cost_price, stock) => {
+    const newName = prompt('Nouveau nom', name);
+    const newPrice = parseFloat(prompt('Nouveau prix de vente', price));
+    const newCost = parseFloat(prompt('Nouveau prix de revient', cost_price));
+    const newStock = parseInt(prompt('Nouveau stock', stock));
+    if (newName && !isNaN(newPrice) && !isNaN(newCost)) {
+      try {
+        const res = await fetch(`/api/products/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ name: newName, price: newPrice, cost_price: newCost, stock: newStock })
+        });
+        if (!res.ok) throw new Error('Erreur modification');
+        showToast('Produit modifié');
+        loadProducts(); loadProfit(); loadCapital(); loadTotaux();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+  };
+
+  window.deleteProduct = async (id) => {
+    if (confirm('Supprimer ce produit ?')) {
+      try {
+        const res = await fetch(`/api/products/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) throw new Error('Erreur suppression');
+        showToast('Produit supprimé');
+        loadProducts(); loadProfit(); loadCapital(); loadTotaux();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+  };
+
+  async function addProduct() {
+    const name = document.getElementById('prodName').value.trim();
+    const price = parseFloat(document.getElementById('prodPrice').value);
+    const cost_price = parseFloat(document.getElementById('prodCost').value);
+    const stock = parseInt(document.getElementById('prodStock').value);
+    if (!name || isNaN(price)) return showToast('Nom et prix vente requis', true);
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name, price, cost_price: isNaN(cost_price) ? 0 : cost_price, stock: isNaN(stock) ? 0 : stock })
+      });
+      if (!res.ok) throw new Error('Erreur ajout');
+      showToast('Produit ajouté');
+      loadProducts(); loadProfit(); loadCapital(); loadTotaux();
+      document.getElementById('prodName').value = '';
+      document.getElementById('prodPrice').value = '';
+      document.getElementById('prodCost').value = '';
+      document.getElementById('prodStock').value = '';
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  async function loadSales() {
+    try {
+      const res = await fetch('/api/sales', { headers: { 'Authorization': `Bearer ${token}` } });
+      const sales = await res.json();
+      const tbody = document.querySelector('#salesTable tbody');
+      tbody.innerHTML = sales.map(s => `
+        <tr>
+          <td>${s.employee_name}</td>
+          <td>${s.product_name}</td>
+          <td>${s.quantity}</td>
+          <td>${s.total_price}€</td>
+          <td>${new Date(s.sale_time).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  }
+
+  function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+
+  // Chargement initial
+  loadStats();
+  loadProducts();
+  loadSales();
+  loadProfit();
+  loadCapital();
+  loadTotaux();
+</script>
+</body>
+</html>

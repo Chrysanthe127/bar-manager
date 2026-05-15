@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Bar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <button class="logout-btn" onclick="logout()">Déconnexion</button>
+  <h1>👑 Administration</h1>
+  <h2>👥 Gestion des utilisateurs</h2>
+  <div class="form-group">
+    <input type="text" id="username" placeholder="Username">
+    <input type="text" id="fullname" placeholder="Nom complet">
+    <input type="password" id="passwordUser" placeholder="Mot de passe">
+    <select id="roleUser"><option value="employee">Employé</option><option value="boss">Patron</option><option value="admin">Admin</option></select>
+    <button onclick="addUser()">➕ Ajouter utilisateur</button>
+  </div>
+  <table id="usersTable"><thead><tr><th>ID</th><th>Username</th><th>Nom</th><th>Rôle</th><th>Action</th></tr></thead><tbody></tbody></table>
+
+  <h2>📊 Toutes les ventes</h2>
+  <table id="allSalesTable"><thead><tr><th>Employé</th><th>Produit</th><th>Qté</th><th>Total</th><th>Date</th></tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+  const token = localStorage.getItem('token');
+  if (!token) window.location.href = 'login.html';
+
+  async function loadUsers() {
+    const res = await fetch('/api/users', { headers: { 'Authorization': `Bearer ${token}` } });
+    const users = await res.json();
+    const tbody = document.querySelector('#usersTable tbody');
+    tbody.innerHTML = users.map(u => `<tr>
+      <td>${u.id}</td><td>${u.username}</td><td>${u.full_name}</td><td>${u.role}</td>
+      <td><button onclick="deleteUser(${u.id})">🗑️</button></td>
+    </tr>`).join('');
+  }
+
+  async function addUser() {
+    const username = document.getElementById('username').value;
+    const full_name = document.getElementById('fullname').value;
+    const password = document.getElementById('passwordUser').value;
+    const role = document.getElementById('roleUser').value;
+    if (!username || !full_name || !password) return alert('Remplissez tous les champs');
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ username, password, role, full_name })
+    });
+    loadUsers();
+  }
+
+  async function deleteUser(id) {
+    if (confirm('Supprimer cet utilisateur ?')) {
+      await fetch(`/api/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+      loadUsers();
+    }
+  }
+
+  async function loadAllSales() {
+    const res = await fetch('/api/sales', { headers: { 'Authorization': `Bearer ${token}` } });
+    const sales = await res.json();
+    const tbody = document.querySelector('#allSalesTable tbody');
+    tbody.innerHTML = sales.map(s => `<tr>
+      <td>${s.employee_name}</td><td>${s.product_name}</td><td>${s.quantity}</td><td>${s.total_price}€</td><td>${new Date(s.sale_time).toLocaleString()}</td>
+    </tr>`).join('');
+  }
+
+  function logout() { localStorage.clear(); window.location.href = 'login.html'; }
+  loadUsers();
+  loadAllSales();
+</script>
+</body>
+</html>
